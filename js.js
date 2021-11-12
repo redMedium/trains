@@ -1,18 +1,31 @@
-const stations = fetch("https://rata.digitraffic.fi/api/v1/metadata/stations")
+var stationShortCodesToNames = new Map();
+
+// Save the search field input text to a variable.
+var searchText = document.querySelector("#searchText").value;
+
+fetch("https://rata.digitraffic.fi/api/v1/metadata/stations")
     .then(response => response.json())
-    .then(data => {return data});
+    .then(data => saveStationData(data));
 
-console.log(stations);
+function saveStationData(data) {
+    for (let i = 0; i < data.length; i++) {
+        stationShortCodesToNames.set(data[i].stationName, data[i].stationShortCode)
+    }
+}
 
-document.querySelector("#searchSubmit").addEventListener("click",                           // Submit button event, when selected, ...
-    () => {                                                                                 // ... calls an anonymous function.
-        var searchText = document.querySelector("#searchText").value;                       // Save the search field input text to a variable.
-        var trainArr = [];
-
-        fetch("https://rata.digitraffic.fi/api/v1/live-trains/station/HKI/TPE")
+// A submit button click event, ...
+document.querySelector("#searchSubmit").addEventListener("click",
+    // ... invokes an anonymous callback function.
+    () => {
+console.log(searchText);
+        stationShortCode = stationShortCodesToNames.get(searchText);
+console.log(stationShortCode);
+        var searchUrl = "https://rata.digitraffic.fi/api/v1/live-trains/station/" + 
+                        stationShortCode + 
+                        "?arrived_trains=5&arriving_trains=5&departed_trains=5&departing_trains=5&include_nonstopping=false&train_categories=Commuter";
+console.log(searchUrl);
+        fetch(searchUrl)
             .then(response => response.json())
-            .then(data => trainArr.push(data));
-
-        console.log(trainArr);
+            .then(data => console.log(data));
     }
 );
