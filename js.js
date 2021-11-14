@@ -18,7 +18,9 @@ fetch("https://rata.digitraffic.fi/api/v1/metadata/stations")
     // Deliver the Response object as JSON.parse-able data
     .then(response => response.json())
     // Deliver data array to a callback function 
-    .then(data => saveStationData(data));   
+    .then(data => saveStationData(data))
+    // Console out an error message if fetch failed
+    .catch(exception => console.log(exception));
 /* Iterate as many times as there are elements in the array argument.
 Array elements are objects, from which corresponding properties are
 excerpted from and used as key-value pairs in the translator */
@@ -63,10 +65,29 @@ function conformWord(word) {
         return word;
     }
 }
-// A submit button click event, ...
-document.querySelector("#searchSubmit").addEventListener("click",
-    // ... invokes an anonymous callback function.
-    () => {
+// A submit button click event invokes an anonymous callback function.
+document.querySelector("#searchSubmit").addEventListener("click", () => {
+    // buildUrl() returns a string that represents the URL used in the data fetching 
+    fetch(buildUrl())
+        // Deliver the Response object as JSON.parse-able data
+        .then(response => response.json())
+        // Access the response's array and ...
+        .then(data => {
+            /* ... iterate over its train objects. Those are then 
+            saved in a global array. trains array must be empty
+            every time a new fetch is made */
+            trains = [];
+            for (let train of data) {
+                // Add train objects to trains array
+                trains.push(train);
+            }
+            console.log(trains);
+        })
+        .then(buildTimetable())
+        // Console out an error message if fetch failed
+        .catch(exception => console.log(exception));
+    // The URL for the train query is returned from this function 
+    function buildUrl() {
         // Save the search field input text into a variable
         var searchText = searchInput.value;
         // conform the search keyword
@@ -81,17 +102,44 @@ document.querySelector("#searchSubmit").addEventListener("click",
                         trains as well as those not stopping at the specified 
                         station. The amount of returned trains is also limited */
                         "?arrived_trains=5&arriving_trains=5&departed_trains=5&departing_trains=5&include_nonstopping=false&train_categories=Commuter";
-        fetch(searchUrl)
-            // Deliver the Response object as JSON.parse-able data
-            .then(response => response.json())
-            // Access the response's array, ...
-            .then(data => {
-                // ... iterate over its Train objects and, ...
-                for (let train of data) {
-                    // save them to a local array.
-                    trains.push(train);
-                }
-            });
-        
+        return searchUrl;
     }
-);
+    function buildTimetable() {
+        sortTrains();
+        function sortTrains() {
+            let departures = [];
+            let arrivals = [];
+            for (let train of trains) {
+                for (let timeTable of train.timeTableRows) {
+                    if (timeTable.stationShortCode === stationShortCode) {
+                        if (timeTable.type === "DEPARTURE") {
+                            departures.push(train);
+                        }
+                        if (timeTable.type === "ARRIVAL") {
+                            arrivals.push(train);
+                        }
+                    }
+                }
+            }
+            arrivals(arrivals);
+            departures(departures);
+            function arrivals(array) {
+                list(array);
+            }
+            function departures(array) {
+                list(array);
+            }
+            function list(array) {
+                
+                for (let train of array) {
+                }
+            }
+        }
+        function clock() {
+            
+        }
+    }
+});
+
+// muista tehä ok tsekit
+// invocation boolean setintervallia varten
