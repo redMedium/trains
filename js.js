@@ -10,10 +10,6 @@ var stationNamesToShortCodes = new Map();
 when the search is made and later used in the creation of 
 the timetables */
 var stationShortCode;
-/* A list of Train-objects, used in the final step of 
-the station search when the schedule is displayed to 
-the user */
-var trains = [];
 /* Variable for the the search input field globally, 
 to be used when retrieving search keywords and when being 
 listened to regarding the autocomplete */
@@ -93,28 +89,32 @@ document.querySelector("#searchSubmit").addEventListener("click", () => {
         // Access the response's array and ...
         .then(data => {
             /* ... iterate over its train objects. Those are then 
-            saved in the global trains array. That array must be empty
-            every time a new fetch is made */
-            trains = [];
+            saved in the trains array. That array must be empty
+            every time a new fetch is made. A list of Train-objects, 
+            used in the final step of the station search when the 
+            schedule is displayed to the user */
+            let trains = [];
             for (let train of data) {
-                // Add train objects to the global trains array
+                // Add train objects to the trains array
                 trains.push(train);
             }
-                                                                                                                        console.log(trains);
+            // Pass trains to the next .then
+            return trains;
         })
         /* This function ends in void as data is eventually 
         printed inside the #timeTablesDiv */
-        .then(createTimeTable())
+        .then(trains => createTimeTable(trains))
         // Console out an error message if fetch failed
         .catch(exception => console.log(exception));
     // The URL for the train query is returned from this function 
     function createUrl() {
         // Save the search field input text into a variable
-        let searchText = searchInput.value;
+        let searchText = "Tampere asema";
         // conform the search keyword
         let searchTextconformed = conformWord(searchText);
         // Translate the conformd search keyword into a corresponding shortcode
-        stationShortCode = stationShortCodesToNames.get(searchTextconformed);
+        let stationShortCode = stationShortCodesToNames.get(searchTextconformed);
+                                                                                                    console.log(stationShortCode);
         // Build a URL-string
         let searchUrl = "https://rata.digitraffic.fi/api/v1/live-trains/station/" + 
                         // Insert the shortcode as a parameter in the query
@@ -127,7 +127,9 @@ document.querySelector("#searchSubmit").addEventListener("click", () => {
         return searchUrl;
     }
     /* The time tables are created and added to the document */
-    function createTimeTable() {
+    function createTimeTable(trains) {
+        
+        console.log(trains);
         // Arrays for different maneuver types of trains 
         var departures = [];
         var arrivals = [];
@@ -172,7 +174,6 @@ document.querySelector("#searchSubmit").addEventListener("click", () => {
                     train.stationN = stationN;
                     // ... it is added to arrivals array 
                     arrivals.push(train);
-                    break;
                 }
                 // If the train is departing from the station ... 
                 if (timeTable.type === "DEPARTURE") {
@@ -183,7 +184,6 @@ document.querySelector("#searchSubmit").addEventListener("click", () => {
                     train.stationN = stationN;
                     // ... it is added to departures array 
                     departures.push(train);
-                    break;
                 }
             }
         }
