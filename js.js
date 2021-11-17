@@ -1,7 +1,15 @@
-/* Station name-to-abbreviation translator, later to be 
+/* Station name-to-abbreviation translator, 
 used in converting human-friendly station names
-into URL-able keywords */
+into URL-able keywords in saveStationData() */
 var stationShortCodesToNames = new Map();
+/* Station abbreviation-to-name translator, 
+does the opposite than the Map above. Used in
+createTimeTable() */
+var stationNamesToShortCodes = new Map();
+/* The abbreviation of the searched station, is initialised 
+when the search is made and later used in the creation of 
+the timetables */
+var stationShortCode;
 /* A list of Train-objects, used in the final step of 
 the station search when the schedule is displayed to 
 the user */
@@ -13,7 +21,13 @@ var searchInput = document.querySelector("#searchText");
 /* Array for the station names, to be used
 in the autocomplete */
 var stationNames = [];
-// Fetch train station data
+// The table where the train departures info is added at createTimeTable()
+var departuresTable = document.querySelector("#departuresTable");
+// The table where the train arrivals info is added at createTimeTable()
+var arrivalsTable = document.querySelector("#arrivalsTable");
+// The div where the clock is added at createTimeTable()
+var clockDiv = document.querySelector("#clockDiv");
+// Fetch train station data from Digitraffic API
 fetch("https://rata.digitraffic.fi/api/v1/metadata/stations")
     // Deliver the Response object as JSON.parse-able data
     .then(response => response.json())
@@ -32,9 +46,11 @@ function saveStationData(data) {
         uniformising */
         stationNames.push(stationName);
         // Conform the station name property in the data object
-        let stationNameconformd = conformWord(stationName);
+        let stationNameconformed = conformWord(stationName);
         // Add key-value pairs to the Map
-        stationShortCodesToNames.set(stationNameconformd, data[i].stationShortCode)
+        stationShortCodesToNames.set(stationNameconformed, data[i].stationShortCode);
+        // Add key-value pairs to the Map
+        stationShortCodesToNames.set(data[i].stationShortCode, stationNameconformed);
     }
 }
 function autoComplete() {
@@ -68,7 +84,7 @@ function conformWord(word) {
 // A submit button click event invokes an anonymous callback function.
 document.querySelector("#searchSubmit").addEventListener("click", () => {
     // buildUrl() returns a string that represents the URL used in the data fetching 
-    fetch(buildUrl())
+    fetch(createUrl())
         // Deliver the Response object as JSON.parse-able data
         .then(response => response.json())
         // Access the response's array and ...
@@ -83,19 +99,19 @@ document.querySelector("#searchSubmit").addEventListener("click", () => {
             }
             console.log(trains);
         })
-        .then(buildTimetable())
+        .then(createTimeTable())
         // Console out an error message if fetch failed
         .catch(exception => console.log(exception));
     // The URL for the train query is returned from this function 
-    function buildUrl() {
+    function createUrl() {
         // Save the search field input text into a variable
-        var searchText = searchInput.value;
+        let searchText = searchInput.value;
         // conform the search keyword
-        searchTextconformed = conformWord(searchText);
+        let searchTextconformed = conformWord(searchText);
         // Translate the conformd search keyword into a corresponding shortcode
-        var stationShortCode = stationShortCodesToNames.get(searchTextconformed);
+        stationShortCode = stationShortCodesToNames.get(searchTextconformed);
         // Build a URL-string
-        var searchUrl = "https://rata.digitraffic.fi/api/v1/live-trains/station/" + 
+        let searchUrl = "https://rata.digitraffic.fi/api/v1/live-trains/station/" + 
                         // Insert the shortcode as a parameter in the query
                         stationShortCode + 
                         /* Add pre-defined parametres to filter out non-passenger 
@@ -104,38 +120,78 @@ document.querySelector("#searchSubmit").addEventListener("click", () => {
                         "?arrived_trains=5&arriving_trains=5&departed_trains=5&departing_trains=5&include_nonstopping=false&train_categories=Commuter";
         return searchUrl;
     }
-    function buildTimetable() {
+    function createTimeTable() {
+        var departures = [];
+        var arrivals = [];
         sortTrains();
+        createArrivalsTableData(arrivals);
+        createDeparturesTableData(departures);
+        createClock();
         function sortTrains() {
-            let departures = [];
-            let arrivals = [];
             for (let train of trains) {
+                let stationN = 0;
                 for (let timeTable of train.timeTableRows) {
                     if (timeTable.stationShortCode === stationShortCode) {
-                        if (timeTable.type === "DEPARTURE") {
-                            departures.push(train);
-                        }
                         if (timeTable.type === "ARRIVAL") {
+                            let fromStationShortCode = train.timeTableRows[train.stationN - 1]
+                                    .stationShortCode,
+                                fromStationName = stationNamesToShortCodes.get(fromStationShortCode);
+                            train.fromStationName = fromStationName;
+                            train.stationN = stationN;
                             arrivals.push(train);
+                            break;
+                        }
+                        if (timeTable.type === "DEPARTURE") {
+                            let toStationShortCode = train.timeTableRows[train.stationN + 1]
+                                    .stationShortCode,
+                                toStationName = stationNamesToShortCodes.get(toStationShortCode);
+                            train.toStationName = toStationName;
+                            train.stationN = stationN;
+                            departures.push(train);
+                            break;
                         }
                     }
-                }
-            }
-            arrivals(arrivals);
-            departures(departures);
-            function arrivals(array) {
-                list(array);
-            }
-            function departures(array) {
-                list(array);
-            }
-            function list(array) {
-                
-                for (let train of array) {
+                    stationN++;
                 }
             }
         }
-        function clock() {
+        function createDeparturesTableData(array) {
+            let tableObj = createTableData(array),
+                fromTd = document.createElement("td");
+            for (let property in tableObj) {
+                let tr = property;
+                departuresTable.append(tr);
+            }
+        }
+        function createArrivalsTableData(array) {
+            let tableObj = createTableData(array),
+                toTd = document.createElement("td");
+            for (let property in tableObj) {
+                let tr = property;
+                arrivalsTable.append(tr);
+            }
+        }
+        function createTableData(array) {
+            let tableObj = {},
+                i = 0;
+            for (let train of array) {
+                let tr = document.createElement("tr"),
+                    trainTd = document.createElement("td"),
+                    timeTd = document.createElement("td"),
+                    estTimeTd = document.createElement("td"),
+                    trackTd = document.createElement("td");
+                    stationInfo = train.timeTableRows[train.stationN];
+                trainTd.innerHTML = train.trainNumber;
+                timeTd.innerHTML = stationInfo.scheduledTime;
+                estTimeTd.innerHTML = stationInfo.actualTime;
+                trackTd.innerHTML = stationInfo.commercialTrack;
+                tr.append(trainTd, timeTd, estTimeTd, trackTd);
+                tableObj.i = tr;
+                i++;
+            }
+            return tableObj;
+        }
+        function createClock() {
             
         }
     }
@@ -143,3 +199,4 @@ document.querySelector("#searchSubmit").addEventListener("click", () => {
 
 // muista tehä ok tsekit
 // invocation boolean setintervallia varten
+// muuta callback hellit promiseiks
