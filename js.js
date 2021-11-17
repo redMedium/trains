@@ -53,7 +53,9 @@ function saveStationData(data) {
     }
 }
 /* The autocomplete feature for the search input: Suggestions 
-appear below the search bar as user types */
+appear below the search bar as user types and are narrowed 
+down when letters are further added to the key phrase, the 
+suggestions show the results that CONTAIN the key phrase */
 function autoComplete() {
 
 }
@@ -124,39 +126,64 @@ document.querySelector("#searchSubmit").addEventListener("click", () => {
         // Return the built URL string
         return searchUrl;
     }
-
+    /* The time tables are created and added to the document */
     function createTimeTable() {
+        // Arrays for different maneuver types of trains 
         var departures = [];
         var arrivals = [];
+        /* Trains are first sorted in corresponding arrays which 
+        in turn ... */
         sortTrains();
+        /* ... work as arguments for the two different 
+        create...TableData() functions */
         createArrivalsTableData(arrivals);
         createDeparturesTableData(departures);
+        // The clock is added between the two timetables 
         createClock();
+        /* Trains are displayed on the left- and right-hand sides 
+        of the #timeTableDiv depending on the type of maneuver, 
+        therefore they are first sorted */
         function sortTrains() {
+            // Iterate over global trains array
             for (let train of trains) {
+                /* Station number is needed when determining the from- or 
+                to-stations relative to the number the queried one represents */
                 let stationN = 0;
+                /* Iterate over each train's timetable ... */
                 for (let timeTable of train.timeTableRows) {
+                    /* ... and search for the queried station */
                     if (timeTable.stationShortCode === stationShortCode) {
-                        if (timeTable.type === "ARRIVAL") {
-                            let fromStationShortCode = train.timeTableRows[train.stationN - 1]
-                                    .stationShortCode,
-                                fromStationName = stationNamesToShortCodes.get(fromStationShortCode);
-                            train.fromStationName = fromStationName;
-                            train.stationN = stationN;
-                            arrivals.push(train);
-                            break;
-                        }
-                        if (timeTable.type === "DEPARTURE") {
-                            let toStationShortCode = train.timeTableRows[train.stationN + 1]
-                                    .stationShortCode,
-                                toStationName = stationNamesToShortCodes.get(toStationShortCode);
-                            train.toStationName = toStationName;
-                            train.stationN = stationN;
-                            departures.push(train);
-                            break;
-                        }
+                        // Sort the trains 
+                        sortByManeuverType(train, timeTable, stationN);
                     }
+                    // Next station, please!
                     stationN++;
+                }
+            }
+            /* Trains are parted into departures and departures arrays depending 
+            on of which type they represent regarding to the queried station */
+            function sortByManeuverType(train, timeTable, stationN) {
+                // If the train is arriving to the station ... 
+                if (timeTable.type === "ARRIVAL") {
+                    let fromStationShortCode = train.timeTableRows[train.stationN - 1]
+                            .stationShortCode,
+                        fromStationName = stationNamesToShortCodes.get(fromStationShortCode);
+                    train.fromStationName = fromStationName;
+                    train.stationN = stationN;
+                    // ... it is added to arrivals array 
+                    arrivals.push(train);
+                    break;
+                }
+                // If the train is departing from the station ... 
+                if (timeTable.type === "DEPARTURE") {
+                    let toStationShortCode = train.timeTableRows[train.stationN + 1]
+                            .stationShortCode,
+                        toStationName = stationNamesToShortCodes.get(toStationShortCode);
+                    train.toStationName = toStationName;
+                    train.stationN = stationN;
+                    // ... it is added to departures array 
+                    departures.push(train);
+                    break;
                 }
             }
         }
