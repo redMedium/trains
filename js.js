@@ -47,12 +47,13 @@ function saveStationData(data) {
         stationNames.push(stationName);
         // Conform the station name property in the data object
         let stationNameconformed = conformWord(stationName);
-        // Add key-value pairs to the Map
+        // Add key-value pairs to both translator Maps
         stationShortCodesToNames.set(stationNameconformed, data[i].stationShortCode);
-        // Add key-value pairs to the Map
         stationShortCodesToNames.set(data[i].stationShortCode, stationNameconformed);
     }
 }
+/* The autocomplete feature for the search input: Suggestions 
+appear below the search bar as user types */
 function autoComplete() {
 
 }
@@ -73,7 +74,7 @@ function conformWord(word) {
     will result in failed queries and are therefore being 
     referenced to according to their UTF-16 encoding */
     function scandiLetterTranslator(word) {
-        // Welcome to the deepest pit of a so called "callback hell"
+
         word = word.replace(/\u00e5/g, "u00e5");
         word = word.replace(/\u00e4/g, "u00e4");
         word = word.replace(/\u00f6/g, "u00f6");
@@ -90,15 +91,17 @@ document.querySelector("#searchSubmit").addEventListener("click", () => {
         // Access the response's array and ...
         .then(data => {
             /* ... iterate over its train objects. Those are then 
-            saved in a global array. trains array must be empty
+            saved in the global trains array. That array must be empty
             every time a new fetch is made */
             trains = [];
             for (let train of data) {
-                // Add train objects to trains array
+                // Add train objects to the global trains array
                 trains.push(train);
             }
-            console.log(trains);
+                                                                                                                        console.log(trains);
         })
+        /* This function ends in void as data is eventually 
+        printed inside the #timeTablesDiv */
         .then(createTimeTable())
         // Console out an error message if fetch failed
         .catch(exception => console.log(exception));
@@ -118,8 +121,10 @@ document.querySelector("#searchSubmit").addEventListener("click", () => {
                         trains as well as those not stopping at the specified 
                         station. The amount of returned trains is also limited */
                         "?arrived_trains=5&arriving_trains=5&departed_trains=5&departing_trains=5&include_nonstopping=false&train_categories=Commuter";
+        // Return the built URL string
         return searchUrl;
     }
+
     function createTimeTable() {
         var departures = [];
         var arrivals = [];
