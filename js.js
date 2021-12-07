@@ -13,16 +13,10 @@ var stationShortCode;
 /* Variable for the the search input field globally, 
 to be used when retrieving search keywords and when being 
 listened to regarding the autocomplete */
-var searchInput = document.querySelector("#searchText");
+var searchText = document.getElementById("searchText");
 /* Array for the station names, to be used
 in the autocomplete */
 var stationNames = [];
-// The table where the train departures info is added at createTimeTable()
-var departuresTable = document.querySelector("#departuresTable");
-// The table where the train arrivals info is added at createTimeTable()
-var arrivalsTable = document.querySelector("#arrivalsTable");
-// The div where the clock is added at createTimeTable()
-var clockDiv = document.querySelector("#clockDiv");
 // Fetch train station data from Digitraffic API
 fetch("https://rata.digitraffic.fi/api/v1/metadata/stations")
     // Deliver the Response object as JSON.parse-able data
@@ -44,7 +38,7 @@ function saveStationData(data) {
         // Conform the station name property in the data object
         let stationNameconformed = conformWord(stationName);
         // Add key-value pairs to both translator Maps
-        stationShortCodesToNames.set(stationNameconformed, data[i].stationShortCode);
+        stationNamesToShortCodes.set(stationNameconformed, data[i].stationShortCode);
         stationShortCodesToNames.set(data[i].stationShortCode, stationNameconformed);
     }
 }
@@ -72,7 +66,6 @@ function conformWord(word) {
     will result in failed queries and are therefore being 
     referenced to according to their UTF-16 encoding */
     function scandiLetterTranslator(word) {
-
         word = word.replace(/\u00e5/g, "u00e5");
         word = word.replace(/\u00e4/g, "u00e4");
         word = word.replace(/\u00f6/g, "u00f6");
@@ -80,155 +73,212 @@ function conformWord(word) {
         return word;
     }
 }
-// A submit button click event invokes an anonymous callback function.
+// SUBMIT BUTTON - click event invokes an anonymous callback function.
 document.querySelector("#searchSubmit").addEventListener("click", () => {
     // buildUrl() returns a string that represents the URL used in the data fetching 
     fetch(createUrl())
         // Deliver the Response object as JSON.parse-able data
         .then(response => response.json())
-        // Access the response's array and ...
-        .then(data => {
-            /* ... iterate over its train objects. Those are then 
-            saved in the trains array. That array must be empty
-            every time a new fetch is made. A list of Train-objects, 
-            used in the final step of the station search when the 
-            schedule is displayed to the user */
-            let trains = [];
-            for (let train of data) {
-                // Add train objects to the trains array
-                trains.push(train);
-            }
-            // Pass trains to the next .then
-            return trains;
-        })
-        /* This function ends in void as data is eventually 
-        printed inside the #timeTablesDiv */
-        .then(trains => createTimeTable(trains))
+        /* Here the data is eventually 
+        printed inside the #timeTablesDiv */    
+        .then(data => createTimeTable(data))
         // Console out an error message if fetch failed
         .catch(exception => console.log(exception));
     // The URL for the train query is returned from this function 
     function createUrl() {
-        // Save the search field input text into a variable
-        let searchText = "Tampere asema";
+        let searchInput = searchText.value;
         // conform the search keyword
-        let searchTextconformed = conformWord(searchText);
+        let searchInputConformed = conformWord(searchInput);
         // Translate the conformd search keyword into a corresponding shortcode
-        let stationShortCode = stationShortCodesToNames.get(searchTextconformed);
-                                                                                                    console.log(stationShortCode);
+        stationShortCode = stationNamesToShortCodes.get(searchInputConformed);
         // Build a URL-string
         let searchUrl = "https://rata.digitraffic.fi/api/v1/live-trains/station/" + 
                         // Insert the shortcode as a parameter in the query
                         stationShortCode + 
                         /* Add pre-defined parametres to filter out non-passenger 
                         trains as well as those not stopping at the specified 
-                        station. The amount of returned trains is also limited */
-                        "?arrived_trains=5&arriving_trains=5&departed_trains=5&departing_trains=5&include_nonstopping=false&train_categories=Commuter";
+                        station. The amount of returned trains is also limited to 
+                        15 minutes maneuver type */
+                        "?departing_trains=10&arriving_trains=10&include_nonstopping=false&train_categories=Commuter,Long-distance";
         // Return the built URL string
         return searchUrl;
     }
     /* The time tables are created and added to the document */
     function createTimeTable(trains) {
-        
-        console.log(trains);
-        // Arrays for different maneuver types of trains 
-        var departures = [];
-        var arrivals = [];
-        /* Trains are first sorted in corresponding arrays which 
-        in turn ... */
-        sortTrains();
-        /* ... work as arguments for the two different 
-        create...TableData() functions */
-        createArrivalsTableData(arrivals);
-        createDeparturesTableData(departures);
-        // The clock is added between the two timetables 
-        createClock();
-        /* Trains are displayed on the left- and right-hand sides 
-        of the #timeTableDiv depending on the type of maneuver, 
-        therefore they are first sorted */
-        function sortTrains() {
-            // Iterate over global trains array
-            for (let train of trains) {
-                /* Station number is needed when determining the from- or 
-                to-stations relative to the number the queried one represents */
-                let stationN = 0;
-                /* Iterate over each train's timetable ... */
-                for (let timeTable of train.timeTableRows) {
-                    /* ... and search for the queried station */
-                    if (timeTable.stationShortCode === stationShortCode) {
-                        // Sort the trains 
-                        sortByManeuverType(train, timeTable, stationN);
+        let arrivals = [],
+            departures = [];
+        createRecords(trains)
+        arrivals = sortInfosByTime(arrivals);
+        departures = sortInfosByTime(departures);
+        appendTimetableRows(
+            createTimetableRows(arrivals),
+            "arrivals"
+        );
+        appendTimetableRows(
+            createTimetableRows(departures),
+            "departures"
+        );
+        // Only the essential data is extracted from each train 
+        function createRecords(trains) {
+            let arrivalsObj = {},
+                departuresObj = {},
+                stationNumber;
+            for (train of trains) {
+                stationNumber = 0;
+                for (station of train.timeTableRows) {
+                    let trainId,
+                        scheduledAtTimeZone,
+                        liveEstimateAtTimeZone;
+                    if (station.stationShortCode === stationShortCode 
+                       && station.actualTime === undefined) {
+
+                        trainId = train.trainType + train.trainNumber;
+                        scheduledAtTimeZone = new Date(station.scheduledTime);
+                        liveEstimateAtTimeZone = new Date(station.liveEstimateTime);
+
+                        if (station.type === "ARRIVAL") {
+                            arrivalsObj = createtrainInfoObj(stationNumber - 1);
+                            arrivals.push(arrivalsObj);
+                        }
+                        if (station.type === "DEPARTURE") {
+                            departuresObj = createtrainInfoObj(stationNumber + 1);
+                            departures.push(departuresObj);
+                        }
+                        function createtrainInfoObj(stationRefNum) {
+                            trainInfoObj = {
+                                dateTime : scheduledAtTimeZone,
+                                train : trainId,
+                                time : scheduledAtTimeZone.getHours() + 
+                                    ":" + twoDigitMinutes(scheduledAtTimeZone.getMinutes()),
+                                estTime : (() => {
+                                    if (liveEstimateAtTimeZone != "Invalid Date") {
+                                        return liveEstimateAtTimeZone.getHours() + 
+                                        ":" + twoDigitMinutes(liveEstimateAtTimeZone.getMinutes())
+                                    } else {
+                                        return "";
+                                    }
+                                })(),
+                                track : station.commercialTrack,
+                                fromOrTo : (() => {
+                                    let stationName = stationShortCodesToNames.get(
+                                        train.timeTableRows[stationRefNum].stationShortCode);
+                                    stationNameFormatted = formatStationNameForPresentation(stationName);
+                                    return stationNameFormatted;                                    
+                                })()
+                            }
+                            if (trainInfoObj.time === trainInfoObj.estTime) {
+                                trainInfoObj.estTime = "";
+                            }
+                            return trainInfoObj;
+                        }
+                        function twoDigitMinutes(minutes) {
+                            if (minutes.toString().length < 2) {
+                                minutes = "0" + minutes.toString();
+                            }
+                            return minutes;
+                        }
+                        function formatStationNameForPresentation(stationName) {
+                            stationName = stationName.replace(/u00e5/g, "\u00e5");
+                            stationName = stationName.replace(/u00e4/g, "\u00e4");
+                            stationName = stationName.replace(/u00f6/g, "\u00f6");
+                            stationName = (() => {
+                                let firstWordFirstLetter = stationName.slice(0, 1),
+                                    restOfWord = stationName.slice(1, stationName.length),
+                                    capitalLetter = firstWordFirstLetter.toUpperCase();
+                                stationName = capitalLetter + restOfWord;
+                                return stationName;
+                            })();
+                            return stationName;
+                        }
                     }
-                    // Next station, please!
-                    stationN++;
+                    stationNumber++;
                 }
-            }
-            /* Trains are parted into departures and departures arrays depending 
-            on of which type they represent regarding to the queried station */
-            function sortByManeuverType(train, timeTable, stationN) {
-                // If the train is arriving to the station ... 
-                if (timeTable.type === "ARRIVAL") {
-                    let fromStationShortCode = train.timeTableRows[train.stationN - 1]
-                            .stationShortCode,
-                        fromStationName = stationNamesToShortCodes.get(fromStationShortCode);
-                    train.fromStationName = fromStationName;
-                    train.stationN = stationN;
-                    // ... it is added to arrivals array 
-                    arrivals.push(train);
-                }
-                // If the train is departing from the station ... 
-                if (timeTable.type === "DEPARTURE") {
-                    let toStationShortCode = train.timeTableRows[train.stationN + 1]
-                            .stationShortCode,
-                        toStationName = stationNamesToShortCodes.get(toStationShortCode);
-                    train.toStationName = toStationName;
-                    train.stationN = stationN;
-                    // ... it is added to departures array 
-                    departures.push(train);
-                }
+                
             }
         }
-        function createDeparturesTableData(array) {
-            let tableObj = createTableData(array),
-                fromTd = document.createElement("td");
-            for (let property in tableObj) {
-                let tr = property;
-                departuresTable.append(tr);
+        function sortInfosByTime(trainInfoObjs) {
+            trainInfoObjs.sort((a, b) => {
+                return a.dateTime - b.dateTime;
+            });
+            for (obj of trainInfoObjs) {
+                delete obj.dateTime;
             }
+            return trainInfoObjs;
         }
-        function createArrivalsTableData(array) {
-            let tableObj = createTableData(array),
-                toTd = document.createElement("td");
-            for (let property in tableObj) {
-                let tr = property;
-                arrivalsTable.append(tr);
+        function createTimetableRows(trainInfoObjs) {
+            let timeTableArr = [],
+                rowN = 0,
+                tr,
+                td,
+                property;
+            for (trainInfoObj of trainInfoObjs) {
+                tr = document.createElement("tr");
+                for (let i = 0; i < Object.keys(trainInfoObj).length; i++) {
+                    td = document.createElement("td");
+                    property = Object.keys(trainInfoObj)[i].toString();
+                    td.innerHTML = trainInfoObj[property];
+                    tr.appendChild(td);
+                }
+                timeTableArr.push(tr);
+                rowN++;
             }
+            return timeTableArr;
         }
-        function createTableData(array) {
-            let tableObj = {},
+        function appendTimetableRows(timeTableArrs, maneuverType) {
+            let arrivalsTable = document.querySelector("#arrivalsTable"),
+                departuresTable = document.querySelector("#departuresTable"),
                 i = 0;
-            for (let train of array) {
-                let tr = document.createElement("tr"),
-                    trainTd = document.createElement("td"),
-                    timeTd = document.createElement("td"),
-                    estTimeTd = document.createElement("td"),
-                    trackTd = document.createElement("td");
-                    stationInfo = train.timeTableRows[train.stationN];
-                trainTd.innerHTML = train.trainNumber;
-                timeTd.innerHTML = stationInfo.scheduledTime;
-                estTimeTd.innerHTML = stationInfo.actualTime;
-                trackTd.innerHTML = stationInfo.commercialTrack;
-                tr.append(trainTd, timeTd, estTimeTd, trackTd);
-                tableObj.i = tr;
-                i++;
+            if (maneuverType === "arrivals") {
+                createTableTemplate("arrivals");
+                for (timeTableArr of timeTableArrs) {
+                    arrivalsTable.appendChild(timeTableArr);
+                }
             }
-            return tableObj;
-        }
-        function createClock() {
-            
+            if (maneuverType === "departures") {
+                createTableTemplate("departures");
+                for (timeTableArr of timeTableArrs) {
+                    departuresTable.appendChild(timeTableArr);
+                }
+            }
+            function createTableTemplate(type) {
+                let template = 
+                    `
+                    <tr>
+                        <td><h3>Train</h3></td>
+                        <td><h3>Time</h3></td>
+                        <td><h3>Est. time</h3></td>
+                        <td><h3>Track</h3></td>
+                    `;
+                    if (type === "arrivals") {
+                        arrivalsTable.innerHTML = 
+                            `
+                            <tr>
+                                <th colspan="5"><h2>Train arrivals</h2></th>
+                            </tr>
+                            ` +
+                            template + 
+                            `
+                                <td><h3>From</h3></td>
+                            </tr>
+                            `;
+                    }
+                    if (type === "departures") {
+                        departuresTable.innerHTML = 
+                        `
+                        <tr>
+                            <th colspan="5"><h2>Train departures</h2></th>
+                        </tr>
+                        ` +
+                        template + 
+                        `
+                            <td><h3>To</h3></td>
+                        </tr>
+                        `;
+                    }
+            }
         }
     }
 });
-
-// muista tehä ok tsekit
+// Muistilista: 
 // invocation boolean setintervallia varten
-// muuta callback hellit promiseiks
+// järkkää ajan mukaan aikataulut
