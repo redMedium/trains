@@ -1,15 +1,27 @@
 <!DOCTYPE html>
 <html>
 <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="css.css">
+    <title>Project 1 - Daniel Schmidt</title>
     <script src="js.js" async></script>
 </head>
 <body>
-    <div>
+    <div id="searchDiv" style="display: none">
         <label for="searchText">Search for trainstations: </label>
-        <input id="searchText" autocomplete="off" type="text" placeholder="e.g. Tampere"/>
+        <br>
+        <input id="searchText" autocomplete="off" type="text" placeholder="e.g. Tampere Asema"/>
         <input id="searchSubmit" type="button" value="Search">
+        <div id="autoCompleteDiv">
+            <ul id="autoCompleteUl">
+
+            </ul>
+        </div>
     </div>
+    <p id="statusMessage"></p>
     <div id="timeTablesDiv">
+        <h1></h1>
         <table id="departuresTable">
             
         </table>

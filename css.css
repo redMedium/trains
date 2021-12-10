@@ -1,0 +1,61 @@
+@import url('https://fonts.googleapis.com/css2?family=Source+Code+Pro:wght@300;400&display=swap');
+
+* {
+    color: #c1cfff;
+    font-family: 'Source Code Pro', monospace;
+    font-size: 3vw;
+    list-style-type: none;
+}
+
+body {
+    margin: auto;
+    background-color: #01040f;
+}
+
+h1 {
+    font-size: 200%;
+    text-align: center;
+    background-color: #010400;
+}
+
+h2 {
+    font-size: 150%;
+}
+
+input, select {
+    background-color: #1f2d58;
+    border-radius: 4px;
+    border: 0;
+    margin: 1vw;
+    padding: 10px;
+}
+
+input:hover {
+    background-color: #334fa3;
+    color: #ffffff;
+}
+
+select:hover{
+    background-color: #334fa3;
+    color: #ffffff;
+    transition-duration: 0.15s;
+}
+
+table {
+    border-spacing: 4px;
+    margin: auto;
+    padding-bottom: 30px;
+}
+
+::placeholder {
+    color: rgb(88, 88, 88);
+}
+
+tr, td, th {
+    border-radius: 4px;
+    padding: 10px;
+    background-color: #010400;
+}
+
+@media only screen and (min-width: 1000px) {
+}
